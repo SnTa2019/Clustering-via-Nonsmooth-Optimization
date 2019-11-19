@@ -45,7 +45,8 @@
 !*     for LMBM-Clust:
 !*
 !*       N. Karmitsa, A. Bagirov and S. Taheri, "Clustering in Large Data Sets with 
-!*       the Limited Memory Bundle Method", submitted, 2016.
+!*       the Limited Memory Bundle Method", Pattern Recognition, Vol. 83, pp. 245-259, 
+!*       2018.
 !*
 !*       N. Karmitsa, A. Bagirov and S. Taheri, "MSSC Clustering of Large Data using
 !*       the Limited Memory Bundle Method" TUCS Technical Report, No. 1164, 
