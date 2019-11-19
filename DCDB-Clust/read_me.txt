@@ -50,11 +50,12 @@
 !*     References:
 !*
 !*     "New diagonal bundle method for clustering problems in very large data sets",
-!*     Napsu Karmitsa, Adil Bagirov and Sona Taheri, submitted, 2016.
+!*     Napsu Karmitsa, Adil Bagirov and Sona Taheri, European Journal of Operational 
+!*     Research, Vol. 263, No. 2, pp. 367-379, 2017.
 !*
 !*     "Diagonal Bundle Method for Solving the Minimum Sum-of-Squares Clustering 
 !*     Problems”, Napsu Karmitsa, Adil Bagirov, and Sona Taheri, TUCS Technical 
-!*     Report, No. XXXX, Turku Centre for Computer Science, Turku, 2016.
+!*     Report, No. 1156, Turku Centre for Computer Science, Turku, 2016.
 !*
 !*     "Nonsmooth DC programming approach to the minimum sum-of-squares 
 !*     clustering problems", Adil Bagirov, Sona Taheri and Julien Ugon, 
@@ -68,3 +69,4 @@
 !*     DP140103213).
 !*
 !*************************************************************************
+
