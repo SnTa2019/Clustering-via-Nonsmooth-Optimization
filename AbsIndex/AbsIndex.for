@@ -1,8 +1,8 @@
-c============================================================================================
+c=============================================================
 c Code for new Absolute indices: determining compactness, separability and number of clusters
-c============================================================================================
+c=============================================================
 c     main programm
-      PARAMETER(maxvar=7000, maxrec=200000, maxclust=100, maxnft=300
+      PARAMETER(maxvar=7000, maxrec=200000, maxclust=70, maxnft=300
      1 ,maxclass=100, maxsize=7000000)
       implicit double precision(a-h,o-z)
       double precision x(maxvar),a(maxrec,maxnft),dminim(maxrec)
@@ -14,22 +14,60 @@ c     main programm
      1 ,/crecord/nrecord,/cnk/nk,nel,/adminim/dminim,/cns/ns
      2 ,/cnob/plabel,nob,/cgamma/gamma1,gamma2,/ctnorm/tnorm,/cnel2/nel2
      3 ,/cnpnout/npurity,/cnclass/nclass,/craver/raver,/cglob/xglob
-     4 ,/cepsil/epsil1,/cmed/dmed0,/cmean/dmean0,/cstd/std0,/cnnn/nmin
-      open(49,file='Results.txt')
-      open(78,file='inputdata.txt',status='old',form='formatted')
-
+     4 ,/cmed/dmed0,/cmean/dmean0,/cstd/std0,/ceps1/eps1
+      open(50,file='Compactness_clusters-A1(k=20).txt')
+      open(51,file='Margins_between_clusters-A1(k=20).txt')
+      open(49,file='Allres-A1(k=20).txt')
+      open(78,file='A1(k=20).txt',status='old',form='formatted')
 c======================================================================
-c users to provide 
+! Data sets information, Name: number of points, number of features 
+! without class label 
+c======================================================================
+!	Ionosphere:	          351,	34
+!	Vehicle:	          846,	18
+!	BanknoteAuthent:	 1372,	 4
+!	ImageSegm:	         2310,	19
+!	TSPLIB3038:	         3038,	 2
+!	LandsatSatellite:	 6435,	36
+!	Pageblocks:      	 5473,	10
+!	Pendigit:       	10992,	16
+!	D15112:	            15112,	 2
+!	Letters:        	20000,	16
+!	ShuttleControl:  	58000,   9
+!	PersonActivity:	   164860,	 3
+!	Skin_NonSkin:      245057,   3
+!	sw24978:        	24978,   2
+!   Liver:                345,   6
+!   A1(k=20):            3000,   2
+!   A2(k=35):            5250,   2
+!   A3(k=50):            7500,   2
+!   Franti256:           1024, 256 
+!   MiniBooNE_PID      130065,  50
+!   unbalance            6500,   2
 c======================================================================
       PRINT *,' '
       PRINT *,'Number of features:'
       read *,nft
       PRINT *,' '
+      PRINT *,'Class outputs?'
+      PRINT *,' '
+      PRINT *,'   1 - if yes'
+      PRINT *,'   2 - if no'
+      read *,npurity
+      PRINT *,' '
+      if (npurity.eq.1) then
+         PRINT *,'Number of classes in your dataset:'
+         read *,nclass
+         PRINT *,' '
+         PRINT *,'Output column:'
+         read *,noutcom
+         PRINT *,' '
+      end if
       PRINT *,'Maximum number of clusters:'
       read *,nclust
       PRINT *,' '
-      PRINT *,'Minimum number of clusters:'
-      read *,nmin
+      PRINT *,'Value of epsilon (between 0.1 and 0.00001):'
+      read *,eps1
       PRINT *,' '
 c===========================================================
       tlimit=1.8d+04
@@ -40,7 +78,7 @@ c===========================================================
   900 stop 'Error in input file'       
   901 WRITE(49,*) 'Input complete. Number of records: ',nrecord
       WRITE(49,*)
-      npurity =2
+
       IF(npurity.eq.1) mf=nft-1
       IF(npurity.eq.2) mf=nft
       IF(npurity.eq.2) noutcom=0
@@ -81,11 +119,15 @@ c===========================================================
  22      nob(j)=nob(j)+1
         end do
         do i=1,nclass
-         WRITE(49,41) i,plabel(i),nob(i)
+          WRITE(49,41) i,plabel(i),nob(i)
         end do
        END if
- 41    FORMAT('Class',i4,' label',f7.0,'  number of instances',i7) 
-
+ 41    FORMAT('Class',i4,' label',f7.0,'  number of instances',i7)
+c======================================================================
+       write(49,*)
+       write(49,251) eps1
+  251  format('eps = ', f10.6)
+       write(49,*)  
 c======================================================================
 c First method - L2, rad - radius of a(.,.), 
 c dk2 - list of different distance, dk3 - list of increasing distances
@@ -115,9 +157,8 @@ c======================================================================
       end do
       rad=rad/dble(idif)
       epsil1=rad
-    
 c---------------------------------------------------
-      call sortinc(dk2,dk3,idif)
+      call sorting(dk2,dk3,idif)
       do i=1,idif
        dk3(i+1)=dk3(i)
       end do
@@ -137,15 +178,15 @@ c=====================================================================
       end if
       
       if((nrecord.gt.1000).and.(nrecord.le.5000)) then
-       gamma1=7.0d-01
-       gamma2=4.0d-01
-       gamma3=3.0d-01
+       gamma1=1.0d+00
+       gamma2=1.0d+00
+       gamma3=1.0d+00
       end if
 
       if((nrecord.gt.5000).and.(nrecord.le.15000)) then
-       gamma1=5.0d-01
-       gamma2=3.0d-01
-       gamma3=2.0d-01
+       gamma1=9.0d-01
+       gamma2=9.0d-01
+       gamma3=9.0d-01
       end if
       if((nrecord.gt.15000).and.(nrecord.le.50000)) then
        gamma1=2.0d-01
@@ -158,9 +199,14 @@ c=====================================================================
        gamma3=1.0d-03
       end if
       call cpu_time(time1)
-      
+c====================================================================
+      write(51,703)
+ 703  FORMAT('   #Clust','  Clust1:','     Clust2:','    Dist. based')
+      WRITE(51,*)       
 c====================================================================
       do nc=1,nclust
+       PRINT 42,nc
+ 42    FORMAT('Cluster No.:',i10)
        if(nc.eq.1) then
                    call clusters(x,f)
                    raver=0.0d+00
@@ -180,10 +226,9 @@ c====================================================================
                    call finresult(x)
                    write(49,*)
                    write(49,149) f
- 149               format('The value of function f1 =',f30.4)             
+ 149               format('The value of function f1 =',f30.4)                  
                    toler=1.0d-02*f/dble(nrecord)
-
-c====================================================================
+c==================================================================
        WRITE(49,*)
        WRITE(49,*)
        WRITE(49,704)
@@ -194,27 +239,11 @@ c====================================================================
        WRITE(49,705)
  705   FORMAT('Func. val - the optimal value of the clustering funct.')
        WRITE(49,706)
- 706   FORMAT('Comp-f    - compactness of cluster distribution')
+ 706   FORMAT('Comp-ind  - compactness of cluster distribution')
        WRITE(49,726)
- 726   FORMAT('Comp-s    - compactness of reduced clust. distr.')
+ 726   FORMAT('Sep-ind   - separability index for the clus. distrib.')
        WRITE(49,707)
- 707   FORMAT('S-ratio-f - ratio of separated of clusters')
-       WRITE(49,708)
- 708   FORMAT('Margin-f  - margin for cluster distrbution')
-       WRITE(49,727)
- 727   FORMAT('Sep-err-f - fraction of correctly classified points')
-       WRITE(49,737)
- 737   FORMAT('S-ratio-s - ratio of separated of reduced clust. distr ')
-       WRITE(49,738)
- 738   FORMAT('Margin-s  - margin for reduced cluster distrbution')
-       WRITE(49,739)
- 739   FORMAT('Sep-er-s  - fraction of correctly class. points(reduced')
-       WRITE(49,740)
- 740   FORMAT('S-ratio-m - ratio of separated of clust. using medians')
-       WRITE(49,741)
- 741   FORMAT('Margin-m  - margin for cluster distrbution using median')
-       WRITE(49,742)
- 742   FORMAT('Sep-er-m  - fraction of correctly class.  with medians')
+ 707   FORMAT('Tk        - ratio: (1-compactness)/separability index')
        WRITE(49,709)
  709   FORMAT('Sil-proc  - procent of points with positive silhouettes')
        WRITE(49,710)
@@ -236,12 +265,11 @@ c====================================================================
 c===================================================================
        WRITE(49,*)
        WRITE(49,701)
- 701   FORMAT('#Clust','           Func. val.',' |','  Comp-f.'
-     1 ,' Comp-s.',' Comp-m.','|',' S-rat-f','  M-min-f','   M-sum-f'
-     1 ,' |',' S-rat-s','  M-min-s','   M-sum-s',' |',' S-rat-m'
-     2 ,'  M-min-m','   M-sum-m',' |',' Sil-pr',' Sil-av','     DB'
-     3 ,'     XB','      DI','          CH','        Gstr','     Grex')
-       WRITE(49,*)
+ 701   FORMAT('#Clust','           Func. val.',' |',' Comp-ind.'
+     1 ,' Sep-ind.','     Tk  ','|','  Sil-proc','   Sil-aver'
+     2 ,'     DB','           XB','         DI','           CH'
+     3 ,'            Gstr','        Grex')
+       WRITE(49,*) 
 c====================================================================
         go to 1
        END if
@@ -336,14 +364,15 @@ c================================================================
        IF(time4.gt.tlimit) GO TO 2
   1   end do
   2   continue
-
-      CLOSE(49)
+      close(49)
+      close(50)
+      CLOSE(51)
       close(78)
       stop
       end
 
       subroutine clusters(x,f)
-      PARAMETER(maxdim=2000, maxrec=200000, maxclust=100, maxnft=300,
+      PARAMETER(maxdim=2000, maxrec=200000, maxclust=70, maxnft=300,
      1 maxclass=100)
       implicit double precision (a-h,o-z)
       allocatable lcand1(:)
@@ -476,7 +505,7 @@ c=========================================================================
 c  Step2 computes clusters for each data point
 c=========================================================================
       subroutine step2(toler,nstart,x2)
-      PARAMETER(maxdim=2000, maxrec=200000, maxclust=100, maxnft=300
+      PARAMETER(maxdim=2000, maxrec=200000, maxclust=70, maxnft=300
      1 ,maxsize=7000000)
       implicit double precision (a-h,o-z)
       allocatable fmin1(:),fval(:),l4(:),lcand1(:)
@@ -605,7 +634,7 @@ c=========================================================================
       end
 
       subroutine auxfunc(f,x)
-      PARAMETER(maxvar=7000, maxrec=200000, maxclust=100, maxnft=300)
+      PARAMETER(maxvar=7000, maxrec=200000, maxclust=70, maxnft=300)
       implicit double precision (a-h,o-z)
       allocatable dist1(:)
       double precision x(maxvar),a(maxrec,maxnft),dminim(maxrec)
@@ -635,10 +664,9 @@ c=========================================================================
        end do
       return
       end
-c=====================================================================
 
       subroutine auxgrad(x,grad)
-      PARAMETER(maxvar=7000, maxrec=200000, maxclust=100, maxnft=300)
+      PARAMETER(maxvar=7000, maxrec=200000, maxclust=70, maxnft=300)
       implicit double precision (a-h,o-z)
       double precision x(maxvar),a(maxrec,maxnft),dminim(maxrec)
      1 ,grad(maxvar)
@@ -660,7 +688,7 @@ c=====================================================================
 
 c=====================================================================
       subroutine func(f,x)
-      PARAMETER(maxvar=7000, maxrec=200000, maxclust=100, maxnft=300)
+      PARAMETER(maxvar=7000, maxrec=200000, maxclust=70, maxnft=300)
       implicit double precision (a-h,o-z)
       allocatable dist2(:,:)
       double precision x(maxvar),a(maxrec,maxnft)
@@ -693,10 +721,9 @@ c=====================================================================
       end do
       return
       end
-c=====================================================================
 
       subroutine funcgrad(x,grad)
-      PARAMETER(maxvar=7000, maxrec=200000, maxclust=100, maxnft=300)
+      PARAMETER(maxvar=7000, maxrec=200000, maxclust=70, maxnft=300)
       implicit double precision (a-h,o-z)
       double precision x(maxvar),a(maxrec,maxnft),grad(maxvar)
       integer lact3(maxrec)
@@ -828,8 +855,10 @@ c===========================================================
                         do i=1,m
                          x(i)=x(i)+step*g(i)
                         end do
+c                        print 3, niter,ndg,f2,sl,r
                         IF(ndg.le.2) sl=1.1d+00*sl
                         GO TO 2
+c 3                      format(I6,I4,3f16.8)
              end if
          END do
 c=====================================================
@@ -931,16 +960,15 @@ c========================================
       j2=0
       do i=1,jvertex
        IF(i.ne.kzero) then
-         j2=j2+1
-         ij(j2)=ij(i)
-         z(j2)=z(i)
+                     j2=j2+1
+                     ij(j2)=ij(i)
+                     z(j2)=z(i)
        END if
       end do
       jvertex=j2
       go to 2
       return
       end
-c=====================================================================
 
       subroutine equations(n,z1)
       implicit double precision (a-h,o-z)
@@ -1071,39 +1099,31 @@ c  w      - degree of membership of point in fuzzy clustering
 c  ind    - indicator showing whether annulus is empty or nonempty
 c==================================================================
       subroutine finresult(x)
-      PARAMETER(maxvar=7000, maxrec=200000, maxclust=100, maxnft=300
+      PARAMETER(maxvar=7000, maxrec=200000, maxclust=70, maxnft=300
      1 ,maxclass=100, maxdiv=200000)
       implicit double precision(a-h,o-z)
       allocatable:: dist1(:,:), w(:,:),IQ(:,:,:),dk1(:),dk3(:)
-     1 ,dist2(:,:),tmar(:,:)
-      allocatable dminim1(:),lind(:)
+      allocatable dminim1(:),lind(:),dist2(:,:),tmar(:,:),tmar1(:,:)
       double precision x(maxvar),a(maxrec,maxnft),dminim(maxrec)
      1 ,radmax(maxclust),dist(maxclust,maxclust),fk(maxclust)
-     2 ,sa(maxclust),xglob(maxvar),compact(3,maxclust)
-     3 ,comp(maxclust),cor(maxclust),ext(maxclust),oirex(maxclust)
-     4 ,oistr(maxclust),y(maxvar),compn(maxclust),radrex(maxclust)
-     5 ,radmed(maxclust),compm(maxclust),sepbar(3,maxclust)
-     6 ,sephat(3,maxclust),silave(maxclust),dab(maxclust),xben(maxclust)
-     7 ,cen(maxclust),parc(maxclust),dunn(maxclust),cal(maxclust)
-     8 ,str(maxclust),rex(maxclust)
+     2 ,sa(maxclust),xglob(maxvar),comp(maxclust),cor(maxclust)
+     3 ,ext(maxclust),oirex(maxclust),oistr(maxclust),y(maxvar)
       integer list(maxrec),nel(maxclust),nk(maxclust,maxrec)
-     2 ,NIQ(maxclust,maxclust),nk1(maxrec),ln(maxclust,maxclust)
-     3 ,nn(maxclust)
+     2 ,NIQ(maxclust,maxclust),nk1(maxrec)
       common /c22/a,/cnft/nft,/cmf/mf,/cnclass/nclass,/cnc/nc
-     1 ,/crecord/nrecord,/clist1/list,/cepsil/epsil1,/adminim/dminim
+     1 ,/crecord/nrecord,/clist1/list,/ceps1/eps1,/adminim/dminim
      2 ,/cnk/nk,nel,/cdist/dist,/cnk1/nk1,nel1,/craver/raver
      3 ,/cglob/xglob,/cnel2/nel2,/cmed/dmed0,/cmean/dmean0,/cstd/std0
-     4 ,/clustnumber/compact,sepbar,sephat,silave,dab,xben,cen,parc
-     5 ,dunn,cal,str,rex,/anclust/nclust
       allocate(dk1(maxrec))
       allocate(dk3(maxrec))
       allocate(dminim1(maxrec))
       allocate(dist1(maxrec,maxclust))
       allocate(w(maxrec,maxclust))
       allocate(IQ(maxclust,maxclust,maxrec))
-      allocate(lind(maxrec))
       allocate(dist2(maxclust,maxclust))
       allocate(tmar(maxclust,maxclust))
+      allocate(tmar1(maxclust,maxclust))
+      allocate(lind(maxrec))
 c==============================================================
 c Function value
 c==============================================================
@@ -1112,66 +1132,67 @@ c==============================================================
        f = f+dminim(i)
        dminim1(i)=sqrt(dminim(i))
       end do
+
+c Radius, average radius and median radius of clusters
       do k=1,nc
        k4=0
        radmax(k)=0.0d+00
        do j=1,nel(k)
         k2=nk(k,j)
-        radmax(k)=dmax1(radmax(k),dminim1(k2))                          ! radius of cluster 
+        radmax(k)=dmax1(radmax(k),dminim1(k2))
         k4=k4+1
         dk1(k4)=dminim1(k2)
        end do
-       call compstdev(dk1,dmean,std,nel(k))
-       radrex(k)=dmean+2.0d+00*std                                      ! radius mean+2*standard deviation
-       radrex(k)=dmin1(radrex(k),radmax(k))                             
+       call compstdev(dk1,dmean1,std1,nel(k))
        call compmedian(dk1,nel(k),dmed1)
-       radmed(k)=dmed1                                                  ! radius using median
       end do
+
+c Distance between cluster centers - dist
       do i=1,nc
         dist(i,i)=0.0d+00
         do j=i+1,nc
          dist(i,j)=0.0d+00
          do k=1,mf
-          dist(i,j)=dist(i,j)+(x(k+(i-1)*mf)-x(k+(j-1)*mf))**2          ! dist(i,j) - distance between clusters i and j
+          dist(i,j)=dist(i,j)+(x(k+(i-1)*mf)-x(k+(j-1)*mf))**2
          end do
          dist(i,j)=dsqrt(dist(i,j))
          dist(j,i)=dist(i,j)
         end do
       end do
 
+c Distance between data points and cluster centers - dist1
       do i=1,nrecord
         do j=1,nc
          dist1(i,j)=0.0d+00
          do k=1,mf
-          dist1(i,j)=dist1(i,j)+(x(k+(j-1)*mf)-a(i,k))**2               ! dist1(i,j) - distance between point i and cluster j
+          dist1(i,j)=dist1(i,j)+(x(k+(j-1)*mf)-a(i,k))**2
          end do
          dist1(i,j)=dsqrt(dist1(i,j))
         end do
       end do
-c=====================================================================
-c  Calculating compactness of clusters (full version)
-c=====================================================================
-      eps=1.0d+00*epsil1
-      if(eps.eq.0.0d+00) eps=1.0d-02
-      
-      compf=0.0d+00
-      compmean=0.0d+00
-      compmed=0.0d+00
-
+cc=====================================================================
+cc Calculation of compactness of clusters
+cc=====================================================================
+      comp1=0.0d+00
       do k=1,nc
        do i=1,mf
         y(i)=x(i+(k-1)*mf)
        end do
        call intervals(k,nstep,dminim1,dk3)
-
-c      full cluster
+       if(radmax(k).gt.0.0d+00) then
+             do i=1,nstep
+              dk3(i)=dk3(i)/radmax(k)
+             end do       
+          else 
+             dk3(2)=0.0d+00 
+       end if
        comp2=0.0d+00
        comp3=0.0d+00
        do i=2,nstep
         dk4=dk3(i)-dk3(i-1)
-        if(dk4.le.eps) then
-         dk5=dk3(i)+eps
-         dk6=dk3(i)-eps
+        if(dk4.le.eps1) then
+         dk5=dk3(i)+eps1
+         dk6=dk3(i)-eps1
          nel1=0
          do k1=1,nel(k)
           k2=nk(k,k1)
@@ -1185,102 +1206,45 @@ c      full cluster
            comp2=comp2+(1.0d+00-c1)*dk4
          end if  
         end if
-        if(dk4.gt.eps) then
-          comp3=comp3+dk4-eps         
+        if(dk4.gt.eps1) then
+          comp3=comp3+dk4-eps1         
         end if
        end do
+       
        if(radmax(k).gt.0.0d+00) then
-            comp(k)=1.0d+00-(comp2+comp3)/radmax(k)                     ! compactness of a given cluster k
+            comp(k)=1.0d+00-(comp2+comp3)
          else
             comp(k)=1.0d+00
        end if
-
-       comp2=0.0d+00
-       comp3=0.0d+00
-       do i=2,nstep
-        if(dk3(i).le.radrex(k)) then
-         d8=dk3(i)
-         dk4=dk3(i)-dk3(i-1)
-         if(dk4.le.eps) then
-          dk5=dk3(i)+eps
-          dk6=dk3(i)-eps
-          nel1=0
-          do k1=1,nel(k)
-           k2=nk(k,k1)
-           if((dminim1(k2).gt.dk6).and.(dminim1(k2).le.dk5)) then
-              nel1=nel1+1
-              nk1(nel1)=k2
-           end if
-          end do
-          if(nel1.gt.0) then
-            call sphere(y,c1)
-            comp2=comp2+(1.0d+00-c1)*dk4
-          end if  
-         end if
-         if(dk4.gt.eps) then
-           comp3=comp3+dk4-eps         
-         end if
-        end if
-       end do
-       if(d8.gt.0.0d+00) then
-            compn(k)=1.0d+00-(comp2+comp3)/d8
-         else
-            compn(k)=1.0d+00
+       if(nel(k).le.1) then
+        comp(k)=1.0d+00
        end if
-       compn(k)=dmin1(1.0d+00,compn(k))
-       comp2=0.0d+00
-       comp3=0.0d+00
-       do i=2,nstep
-        if(dk3(i).le.radmed(k)) then
-         d8=dk3(i)
-         dk4=dk3(i)-dk3(i-1)
-         if(dk4.le.eps) then
-          dk5=dk3(i)+eps
-          dk6=dk3(i)-eps
-          nel1=0
-          do k1=1,nel(k)
-           k2=nk(k,k1)
-           if((dminim1(k2).gt.dk6).and.(dminim1(k2).le.dk5)) then
-              nel1=nel1+1
-              nk1(nel1)=k2
-           end if
-          end do
-          if(nel1.gt.0) then
-            call sphere(y,c1)
-            comp2=comp2+(1.0d+00-c1)*dk4
-          end if  
-         end if
-         if(dk4.gt.eps) then
-           comp3=comp3+dmax1(0.0d+00,dk4-eps)         
-         end if
-        end if
-       end do
-       if(d8.gt.0.0d+00) then
-            compm(k)=1.0d+00-(comp2+comp3)/d8
-         else
-            compm(k)=1.0d+00
-       end if
-       compm(k)=dmin1(1.0d+00,compm(k))
-       
-       compf=compf+dble(nel(k))*comp(k)/dble(nrecord)
-       compmean=compmean+dble(nel(k))*compn(k)/dble(nrecord)            ! total for k-clustering
-       compmed=compmed+dble(nel(k))*compm(k)/dble(nrecord)
+       comp1=comp1+dble(nel(k))*comp(k)/dble(nrecord)
       end do
-      compact(1,nc)=compf
-      compact(2,nc)=compmean
-      compact(3,nc)=compmed
-      
+      write(50,*)
+      write(50,*)
+      write(50,*)
+      write(50,*)
+      write(50,803) nc
+ 803  format('The number of clusters:',i8)
+      write(50,*)
+      write(50,403) 
+ 403  format('Compactness of clusters:')
+      write(50,*)
+      write(50,402) (comp(i),i=1,nc)
+ 402  format(20f8.4)      
+      write(50,*)      
+      write(50,401) comp1
+ 401  format('Total compactness number:',f10.5)
       if(nc.eq.1) then
        write(49,*)
-       write(49,249) nc,f,compf,compmean,compmed
-249    format(i8,f24.6,3f12.4)
+       write(49,249) nc,f,comp1
+249    format(i8,f24.6,f12.4)
        return       
       end if
-c======================================================================= 
-c Calculation of sets Q1 and Q2 - full version
-c n(i,j) is the number of points from i-th cluster close to j-th cluster
-c iq(i,j,k) is their list 
-c=======================================================================
+c====================================================================
+c  Calculation of sets Q1 and Q2 - full version 
+c============================================================
       if(nc.gt.1) then
        do i=1,nc
         do j=1,nc
@@ -1309,9 +1273,9 @@ c=======================================================================
         end do
        end do
       end if
-c=======================================================================
-c Calculation of margins - full version-tmar(i,j)-margin between i and j
-c=======================================================================
+c=============================================================
+c Calculation of margins - full version
+c=============================================================
       if(nc.gt.1) then
        do i=1,nc
         do j=1,nc
@@ -1322,64 +1286,25 @@ c=======================================================================
        do i=1,nc
         do j=i+1,nc
          k1=niq(i,j)
-         if(k1.gt.0) then
-          r1=0.0d+00
-          do j1=1,k1
-           k2=iq(i,j,j1)
-           r2=dist1(k2,i)
-           r1=dmax1(r1,r2)
-          end do
-          dist2(i,j)=r1
-          k3=niq(j,i)
-          r3=0.0d+00
-          do j1=1,k3
-           k4=iq(j,i,j1)
-           r2=dist1(k4,j)
-           r3=dmax1(r3,r2)
-          end do
-          dist2(j,i)=r3
-          tmar(i,j)=(dist(i,j)-r1-r3)/dist(i,j)
-         end if 
-         if(k1.eq.0) then
-          tmar(i,j)=0.0d+00
-         end if
+         r1=0.0d+00
+         do j1=1,k1
+          k2=iq(i,j,j1)
+          r2=dist1(k2,i)
+          r1=dmax1(r1,r2)
+         end do
+         dist2(i,j)=r1
+         k3=niq(j,i)
+         r3=0.0d+00
+         do j1=1,k3
+          k4=iq(j,i,j1)
+          r2=dist1(k4,j)
+          r3=dmax1(r3,r2)
+         end do
+         dist2(j,i)=r3
+         tmar(i,j)=(dist(i,j)-r1-r3)/dist(i,j)
+         tmar1(i,j)=5.0d-01*(tmar(i,j)+1.0d+00)
          tmar(j,i)=tmar(i,j)
-        end do
-       end do
-      end if
-c-------------------------------------------------------------------------
-c identification of neighbors-full version: ln(i,j)-list of neighbors of i
-c-------------------------------------------------------------------------
-      if(nc.eq.2) then
-       nn(1)=1
-       nn(2)=1
-       ln(1,nn(1))=2
-       ln(2,nn(2))=1
-      end if
-      if(nc.gt.2) then
-       do i=1,nc
-        nn(i)=0
-       end do
-       do i=1,nc
-        do j=1,nc
-         if(j.ne.i) then
-          k2=0
-          do k=1,nc 
-           if((k.ne.i).and.(k.ne.j)) then
-            sp=0.0d+00
-            do k1=1,mf
-             sp=sp+(x(k1+(j-1)*mf)-x(k1+(i-1)*mf))*(x(k1+(k-1)*mf)
-     1          -x(k1+(i-1)*mf))
-            end do
-            sp=sp/(dist(i,j)*dist(i,k))
-            if((sp.gt.0.5).and.(dist(i,k).lt.dist(i,j))) k2=k2+1
-           end if
-          end do
-          if(k2.eq.0) then
-           nn(i)=nn(i)+1
-           ln(i,nn(i))=j
-          end if
-         end if
+         tmar1(j,i)=tmar1(i,j)
         end do
        end do
       end if
@@ -1387,345 +1312,34 @@ c-----------------------------------------------------
 c Calculation of total margins
 c-----------------------------------------------------
       if(nc.gt.1) then
-       skbar=0.0d+00
-       skhat=0.0d+00
-       n1=0
+       n1=nc*(nc-1)
        n2=0
+       bart1=0.0d+00
        do i=1,nc
-        sk=1.0d+30
-        sk1=0.0d+00
-        do j2=1,nn(i)
-         n1=n1+1
-         j=ln(i,j2)
+        bart2=1.0d+30
+        do j=1,nc
          if(j.ne.i) then
           if(tmar(i,j).gt.0.0d+00) n2=n2+1
-          sk=dmin1(sk,tmar(i,j))
-          sk1=sk1+tmar(i,j)
+          bart2=dmin1(bart2,tmar1(i,j))
          end if
         end do
-        skbar=skbar+sk
-        skhat=skhat+sk1
+        bart1=bart1+bart2*dble(nel(i))/dble(nrecord)
        end do
        sep1=dble(n2)/dble(n1)
-       skbar=skbar/dble(nc)
-       skhat=skhat/dble(n1)
-      end if
-      if(nc.eq.1) then
-       sepbar(1,1)=0.0d+00
-       sephat(1,1)=0.0d+00
-       skbar1=0.0d+00
-       skhat1=0.0d+00
-      end if
-      if(nc.gt.1) then
-       sepbar(1,nc)=skbar
-       sephat(1,nc)=skhat
-       skbar1=skbar
-       skhat1=skhat
-      end if
-c----------------------------------------------------
-c calculation of misclassified points - full version
-c----------------------------------------------------
-      if(nc.gt.1) then
-       do i=1,nrecord
-        lind(i)=0
-       end do
-       do i=1,nc
-        do j=1,nc
-         if(j.ne.i) then
-          n1=niq(i,j)
-          do k=1,n1
-           k1=iq(i,j,k)
-           if(dist1(k1,j).le.dist2(j,i)) then
-            lind(k1)=1
-           end if
-          end do
-         end if
-        end do
-       end do
-       mis=0
-       do i=1,nrecord
-        mis=mis+lind(i)
-       end do
-       cmis1=1.0d+00-dble(mis)/dble(nrecord) 
-      end if
-c====================================================================      
-c  Calculation of sets Q1 and Q2 - relaxed version
-c============================================================
-      if(nc.gt.1) then
-       do i=1,nc
-        do j=1,nc
-         niq(i,j)=0
-        end do
-       end do
-
-       do i=1,nc
-        k1=nel(i)
-        do j=i+1,nc
-         k3=nel(j)
-         do k=1,k1
-          k2=nk(i,k)
-          if(dist1(k2,i).le.radrex(i)) then
-           if(dist1(k2,j).le.dist(i,j)) then
-            niq(i,j)=niq(i,j)+1
-            iq(i,j,niq(i,j))=k2
-           end if
-          end if
-         end do
-         do k=1,k3
-           k2=nk(j,k)
-           if(dist1(k2,j).le.radrex(j)) then
-            if(dist1(k2,i).le.dist(j,i)) then
-             niq(j,i)=niq(j,i)+1
-             iq(j,i,niq(j,i))=k2
-            end if
-           end if
-         end do
-        end do
-       end do
-      end if
-c=============================================================
-c Calculation of margins - relaxed version
-c=============================================================
-      if(nc.gt.1) then
-       do i=1,nc
-        do j=1,nc
-         tmar(i,j) = 0.0d+00 
-        end do
-       end do
-
+       sep2=bart1
        do i=1,nc
         do j=i+1,nc
-         k1=niq(i,j)
-         if(k1.gt.0) then
-          r1=0.0d+00
-          do j1=1,k1
-           k2=iq(i,j,j1)
-           r2=dist1(k2,i)
-           r1=dmax1(r1,r2)
-          end do
-          dist2(i,j)=r1
-          k3=niq(j,i)
-          r3=0.0d+00
-          do j1=1,k3
-           k4=iq(j,i,j1)
-           r2=dist1(k4,j)
-           r3=dmax1(r3,r2)
-          end do
-          dist2(j,i)=r3
-          tmar(i,j)=(dist(i,j)-r1-r3)/dist(i,j)
-         end if 
-         if(k1.eq.0) then
-          tmar(i,j)=0.0d+00
-         end if
-         tmar(j,i)=tmar(i,j)
+         write(51,61) nc,i,j,tmar1(i,j)
         end do
        end do
-      end if
-c----------------------------------------------------
-      if(nc.gt.1) then
-       skbar=0.0d+00
-       skhat=0.0d+00
-       n1=0
-       n2=0
-       do i=1,nc
-        sk=1.0d+30
-        sk1=0.0d+00
-        do j2=1,nn(i)
-         n1=n1+1
-         j=ln(i,j2)
-         if(j.ne.i) then
-          if(tmar(i,j).gt.0.0d+00) n2=n2+1
-          sk=dmin1(sk,tmar(i,j))
-          sk1=sk1+tmar(i,j)
-         end if
-        end do
-        skbar=skbar+sk
-        skhat=skhat+sk1
-       end do
-       seps1=dble(n2)/dble(n1)
-       skbar=skbar/dble(nc)
-       skhat=skhat/dble(n1)
-      end if
-
-      if(nc.eq.1) then
-       sepbar(2,1)=0.0d+00
-       sephat(2,1)=0.0d+00
-       skbar2=0.0d+00
-       skhat2=0.0d+00
-      end if
-      if(nc.gt.1) then
-       sepbar(2,nc)=skbar
-       sephat(2,nc)=skhat
-       skbar2=skbar
-       skhat2=skhat
-      end if
-c--------------------------------------------------------
-c calculation of misclassified points - relaxed version
-c--------------------------------------------------------
-      if(nc.gt.1) then
-       do i=1,nrecord
-        lind(i)=0
-       end do
-       do i=1,nc
-        do j=1,nc
-         if(j.ne.i) then
-          n1=niq(i,j)
-          do k=1,n1
-           k1=iq(i,j,k)
-           if(dist1(k1,j).le.dist2(j,i)) then
-            lind(k1)=1
-           end if
-          end do
-         end if
-        end do
-       end do
-       mis=0
-       do i=1,nrecord
-        mis=mis+lind(i)
-       end do
-       cmis2=1.0d+00-dble(mis)/dble(nrecord) 
-      end if
-c====================================================================      
-c  Calculation of sets Q1 and Q2 - core version
-c============================================================
-      if(nc.gt.1) then
-       do i=1,nc
-        do j=1,nc
-         niq(i,j)=0
-        end do
-       end do
-
-       do i=1,nc
-        k1=nel(i)
-        do j=i+1,nc
-         k3=nel(j)
-         do k=1,k1
-          k2=nk(i,k)
-          if(dist1(k2,i).le.radmed(i)) then
-           if(dist1(k2,j).le.dist(i,j)) then
-            niq(i,j)=niq(i,j)+1
-            iq(i,j,niq(i,j))=k2
-           end if
-          end if
-         end do
-         do k=1,k3
-           k2=nk(j,k)
-           if(dist1(k2,j).le.radmed(j)) then
-            if(dist1(k2,i).le.dist(j,i)) then
-             niq(j,i)=niq(j,i)+1
-             iq(j,i,niq(j,i))=k2
-            end if
-           end if
-         end do
-        end do
-       end do
-      end if
-c=============================================================
-c Calculation of margins - core version
-c=============================================================
-      if(nc.gt.1) then
-       do i=1,nc
-        do j=1,nc
-         tmar(i,j) = 0.0d+00 
-        end do
-       end do
-
-       do i=1,nc
-        do j=i+1,nc
-         k1=niq(i,j)
-         if(k1.gt.0) then
-          r1=0.0d+00
-          do j1=1,k1
-           k2=iq(i,j,j1)
-           r2=dist1(k2,i)
-           r1=dmax1(r1,r2)
-          end do
-          dist2(i,j)=r1
-          k3=niq(j,i)
-          r3=0.0d+00
-          do j1=1,k3
-           k4=iq(j,i,j1)
-           r2=dist1(k4,j)
-           r3=dmax1(r3,r2)
-          end do
-          dist2(j,i)=r3
-          tmar(i,j)=(dist(i,j)-r1-r3)/dist(i,j)
-         end if 
-         if(k1.eq.0) then
-          tmar(i,j)=0.0d+00
-         end if
-         tmar(j,i)=tmar(i,j)
-        end do
-       end do
-      end if
-c----------------------------------------------------
-      if(nc.gt.1) then
-       skbar=0.0d+00
-       skhat=0.0d+00
-       n1=0
-       n2=0
-       do i=1,nc
-        sk=1.0d+30
-        sk1=0.0d+00
-        do j2=1,nn(i)
-         j=ln(i,j2)
-         n1=n1+1
-         if(j.ne.i) then
-          if(tmar(i,j).gt.0.0d+00) n2=n2+1
-          sk=dmin1(sk,tmar(i,j))
-          sk1=sk1+tmar(i,j)
-         end if
-        end do
-        skbar=skbar+sk
-        skhat=skhat+sk1
-       end do
-       sepm1=dble(n2)/dble(n1)
-       skbar=skbar/dble(nc)
-       skhat=skhat/dble(n1)
-      end if
-
-      if(nc.eq.1) then
-       sepbar(3,1)=0.0d+00
-       sephat(3,1)=0.0d+00
-       skbar3=0.0d+00
-       skhat3=0.0d+00
-      end if
-      if(nc.gt.1) then
-       sepbar(3,nc)=skbar
-       sephat(3,nc)=skhat
-       skbar3=skbar
-       skhat3=skhat
-      end if
-c--------------------------------------------------------
-c calculation of misclassified points - core version
-c--------------------------------------------------------
-      if(nc.gt.1) then
-       do i=1,nrecord
-        lind(i)=0
-       end do
-       do i=1,nc
-        do j=1,nc
-         if(j.ne.i) then
-          n1=niq(i,j)
-          do k=1,n1
-           k1=iq(i,j,k)
-           if(dist1(k1,j).le.dist2(j,i)) then
-            lind(k1)=1
-           end if
-          end do
-         end if
-        end do
-       end do
-       mis=0
-       do i=1,nrecord
-        mis=mis+lind(i)
-       end do
-       cmis3=1.0d+00-dble(mis)/dble(nrecord) 
+       write(51,*) 
+61     format(i6,i8,i12,f19.3)
       end if
 c======================================================================
 c   Silhouette coeffcients: ratio - #of points with positive sil to total
 c    #of points, sav - average of all silhouttes
 c======================================================================
+c      go to 777
       if(nc.gt.1) then
        ns=0
        sav=0.0d+00
@@ -1766,11 +1380,10 @@ c======================================================================
        ratio=dble(ns)/dble(nrecord)
        sav=sav/dble(nrecord)
       end if
-      if(nc.eq.1) silave(1)=0.0d+00
-      if(nc.gt.1) silave(nc)=sav
 c====================================================================
 c Davies-Bouldin (DB) validity index
 c====================================================================
+c777   continue
       if(nc.gt.1) then
        do i=1,nc 
         fk(i)=0.0d+00
@@ -1801,8 +1414,6 @@ c====================================================================
        end do
        db=fdb/DBLE(nc)
       end if
-      if(nc.eq.1) dab(1)=1.0d+03
-      if(nc.gt.1) dab(nc)=db      
 c=====================================================================
 c Fuzzy membership
 c=====================================================================
@@ -1853,8 +1464,6 @@ c=====================================================================
        xb=xb1/xb2
       end if
       if(nc.eq.1) xb=1.0d+00
-      if(nc.eq.1) xben(1)=1.0d+00
-      if(nc.gt.1) xben(nc)=xb   
 c=====================================================================
 c CE - Classification entropy index
 c=====================================================================
@@ -1870,8 +1479,6 @@ c=====================================================================
        ce=-ce/dble(nrecord)
       end if
       if(nc.eq.1) ce=1.0d+00
-      if(nc.eq.1) cen(1)=1.0d+00
-      if(nc.gt.1) cen(nc)=ce 
 c=====================================================================
 c PC - Partition coefficient
 c=====================================================================
@@ -1885,8 +1492,6 @@ c=====================================================================
        pc=pc/dble(nrecord)
       end if
       if(nc.eq.1) pc=1.0d+00
-      if(nc.eq.1) parc(1)=1.0d+00
-      if(nc.gt.1) parc(nc)=pc   
 c=====================================================================
 c DI - Dunn index
 c=====================================================================
@@ -1932,8 +1537,6 @@ c=====================================================================
        di=dt3/dt
       end if 
       if(nc.eq.1) di=1.0d+00
-      if(nc.eq.1) dunn(1)=1.0d+00
-      if(nc.gt.1) dunn(nc)=di   
 c=====================================================================
 c CH - Calinski- Harabasz index
 c=====================================================================
@@ -1955,8 +1558,6 @@ c=====================================================================
        CH=ds4*ds1/ds3
       end if
       if(nc.eq.1) CH=0.0d+00
-      if(nc.eq.1) cal(1)=0.0d+00
-      if(nc.gt.1) cal(nc)=ch   
 c======================================================================
 c Calculation G-indices
 c======================================================================
@@ -2000,23 +1601,15 @@ c======================================================================
       if(nc.eq.1) then
        gstr=1.0d+00
        grex=1.0d+00
-       str(1)=1.0d+00
-       rex(1)=1.0d+00
-      end if
+      end if        
+c=====================================================================
       if(nc.gt.1) then
-       str(nc)=gstr
-       rex(nc)=grex
+       sepp=(1.0d+00-comp1)/sep2
+       write(49,1248) nc,f,comp1,sep2,sepp,ratio,sav,db,xb,di,ch,gstr
+     1  ,grex
+1248   format(i5,f22.4,' |',3f9.4,' | ',3f10.4,f13.4,f12.6,f16.4,2f12.4)
       end if
-      
-      if(nc.gt.1) then
-       write(49,248) nc,f,compf,compmean,compmed,sep1,skbar1,skhat1
-     1  ,seps1,skbar2,skhat2,sepm1,skbar3,skhat3,ratio,sav,db,xb,di,ch
-     2  ,gstr,grex
-      end if
-248   format(i5,f22.4,' |',3f8.4,' |',f6.3,2f11.3,'|',f6.3,2f11.3,'|'
-     1 ,f6.3,2f11.3,'|',2f7.3,f8.3,f8.3,f10.6,f12.3,2f9.3)
 c====================================================================
-      if(nc.eq.nclust) call cnumber
       return
       end 
 
@@ -2072,55 +1665,51 @@ c============================================================
 c=========================================================================
 c Finding the median of a set
 c=========================================================================
-      subroutine compmedian(dk,nel,dmed)
+      subroutine compmedian(dk1,nel,dmed1)
        PARAMETER(maxrec=200000)
        implicit double precision (a-h,o-z)
-       allocatable b(:), b1(:)
-       double precision dk(maxrec)
+       allocatable b(:)
+       double precision dk1(maxrec)
        allocate(b(maxrec))
-       allocate(b1(maxrec))
-       do i=1,nel
-        b(i)=dk(i)
-       end do
-       call sortinc(b,b1,nel)
+       call sorting(dk1,b,nel)
        n2=nel/2
        n3=nel-2*n2
        if(n3.eq.0) then
-          dmed=(b1(n2)+b1(n2+1))/2.0d+00
+          dmed1=(b(n2)+b(n2+1))/2.0d+00
          else
-          dmed=b1(n2+1)
+          dmed1=b(n2+1)
        end if
       end subroutine
 
 c=======================================================================
 c Finding the mean value and standard deviation
 c=======================================================================
-      subroutine compstdev(dk,dmean,std,nel)
+      subroutine compstdev(dk1,dmean1,std1,nel)
        PARAMETER(maxrec=200000)
        implicit double precision (a-h,o-z)
-       double precision dk(maxrec)
-       dmean=0.0d+00 
+       double precision dk1(maxrec)
+       dmean1=0.0d+00 
        do i=1,nel
-        dmean=dmean+dk(i)
+        dmean1=dmean1+dk1(i)
        end do 
-       dmean=dmean/dble(nel)
-       std=0.0d+00
+       dmean1=dmean1/dble(nel)
+       std1=0.0d+00
        do i=1,nel
-        std=std+(dk(i)-dmean)**2
+        std1=std1+(dk1(i)-dmean1)**2
        end do
        if(nel.gt.1) then
-            std=std/dble(nel-1)
+            std1=std1/dble(nel-1)
          else
             std1=0.0d+00   
        end if
-       std=dsqrt(std)
+       std1=dsqrt(std1)
       end subroutine
 
 c=========================================================================
 c Finding intervals of a cluster
 c=========================================================================
       subroutine intervals(nc,nstep,dminim1,dk3)
-       PARAMETER(maxrec=200000, maxclust=100)
+       PARAMETER(maxrec=200000, maxclust=70)
        implicit double precision (a-h,o-z)
        allocatable dk2(:)
        double precision dminim1(maxrec),dk3(maxrec)
@@ -2139,7 +1728,7 @@ c=========================================================================
          dk2(i1)=d1
  201    end do
 c---------------------------------------------------
-        call sortinc(dk2,dk3,i1)
+        call sorting(dk2,dk3,i1)
         do i=1,i1
          dk3(i+1)=dk2(i)
         end do
@@ -2150,7 +1739,7 @@ c---------------------------------------------------
 c=======================================================================
 c Ordering numbers in increasing order
 c=======================================================================
-      subroutine sortinc(b,b1,nel)
+      subroutine sorting(b,b1,nel)
        PARAMETER(maxrec=200000)
        implicit double precision (a-h,o-z)
        double precision b(maxrec),b1(maxrec)
@@ -2169,183 +1758,5 @@ c=======================================================================
         end do
         do i=1,nel
          b1(i)=b(i)
-        end do 
-      end subroutine
-
-c=======================================================================
-c Determining the number of clusters
-c=======================================================================
-      subroutine cnumber
-       PARAMETER(maxclust=100)
-       implicit double precision (a-h,o-z)
-       double precision compact(3,maxclust),sepbar(3,maxclust)
-     2 ,sephat(3,maxclust),silave(maxclust),dab(maxclust),xben(maxclust)
-     3 ,cen(maxclust),parc(maxclust),dunn(maxclust),cal(maxclust)
-     4 ,str(maxclust),rex(maxclust)
-       integer list(maxclust)
-       common /clustnumber/compact,sepbar,sephat,silave,dab,xben,cen
-     1  ,parc,dunn,cal,str,rex,/anclust/nclust,/cnnn/n2
-       d1=-1.0d+10
-       d2=1.0d+05
-       d3=1.0d+05
-       d4=-1.0d+10
-       d5=-1.0d+10
-       d6=-1.0d+10
-       d7=-1.0d+10
-       do i=n2,nclust
-        if(silave(i).gt.d1) then
-         d1=silave(i)
-         nsil=i
-        end if
-        if(dab(i).lt.d2) then
-         d2=dab(i)
-         ndab=i
-        end if
-        if(xben(i).lt.d3) then
-         d3=xben(i)
-         nben=i
-        end if
-        if(dunn(i).gt.d4) then
-         d4=dunn(i)
-         ndunn=i
-        end if
-        if(cal(i).gt.d5) then
-         d5=cal(i)
-         ncal=i
-        end if
-        if(str(i).gt.d6) then
-         d6=str(i)
-         nstr=i
-        end if
-        if(rex(i).gt.d7) then
-         d7=rex(i)
-         nrex=i
-        end if
-       end do
-
-       c1=-1.0d+10
-       c2=-1.0d+10
-       c3=-1.0d+10
-       c4=-1.0d+10
-       c5=-1.0d+10
-       c6=-1.0d+10
-       c7=-1.0d+10
-       c8=-1.0d+10
-       c9=-1.0d+10
-       do i=n2,nclust
-        if(compact(1,i).gt.c1) then
-         c1=compact(1,i)
-         ncomf=i
-        end if
-        if(compact(2,i).gt.c2) then
-         c2=compact(2,i)
-         ncoms=i
-        end if
-        if(compact(3,i).gt.c3) then
-         c3=compact(3,i)
-         ncomm=i
-        end if
-        if(sepbar(1,i).gt.c4) then
-         c4=sepbar(1,i)
-         nbarf=i
-        end if
-        if(sepbar(2,i).gt.c5) then
-         c5=sepbar(2,i)
-         nbars=i
-        end if
-        if(sepbar(3,i).gt.c6) then
-         c6=sepbar(3,i)
-         nbarm=i
-        end if
-        if(sephat(1,i).gt.c7) then
-         c7=sephat(1,i)
-         nhatf=i
-        end if
-        if(sephat(2,i).gt.c8) then
-         c8=sephat(2,i)
-         nhats=i
-        end if
-        if(sephat(3,i).gt.c9) then
-         c9=sephat(3,i)
-         nhatm=i
-        end if
-       end do
-c-------------------------------------------------
-c  full version
-c-------------------------------------------------
-        eps=2.0d-02
-        l1=0
-        do i=n2,nclust
-         e1=c1-compact(1,i)
-         if(e1.le.eps) then
-          l1=l1+1
-          list(l1)=i
-         end if
         end do
-        
-        b1=-1.0d+10
-        b2=-1.0d+10        
-        do i=1,l1
-         i1=list(i)
-         if(sepbar(1,i1).gt.b1) then
-          b1=sepbar(1,i1)
-          nebar1=i1
-         end if
-         if(sephat(1,i1).gt.b2) then
-          b1=sephat(1,i1)
-          nehat1=i1
-         end if
-        end do
-c---------------------------------------------------
-c  mean+2*std version
-c-------------------------------------------------
-        l1=0
-        do i=n2,nclust
-         e1=c2-compact(2,i)
-         if(e1.le.eps) then
-          l1=l1+1
-          list(l1)=i
-         end if
-        end do
-        
-        b3=-1.0d+10
-        b4=-1.0d+10        
-        do i=1,l1
-         i1=list(i)
-         if(sepbar(2,i1).gt.b3) then
-          b3=sepbar(2,i1)
-          nebar2=i1
-         end if
-         if(sephat(2,i1).gt.b4) then
-          b4=sephat(2,i1)
-          nehat2=i1
-         end if
-        end do
-c---------------------------------------------------
-c  median (core) version
-c-------------------------------------------------
-        l1=0
-        do i=n2,nclust
-         e1=c3-compact(3,i)
-         if(e1.le.eps) then
-          l1=l1+1
-          list(l1)=i
-         end if
-        end do
-        
-        b5=-1.0d+10
-        b6=-1.0d+10        
-        do i=1,l1
-         i1=list(i)
-         if(sepbar(3,i1).gt.b5) then
-          b5=sepbar(3,i1)
-          nebar3=i1
-         end if
-         if(sephat(3,i1).gt.b6) then
-          b6=sephat(3,i1)
-          nehat3=i1
-         end if
-        end do
-     
-c------------------------------------------------------------
       end subroutine
